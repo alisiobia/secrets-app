@@ -4,7 +4,8 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require('mongoose');
-var encrypt = require('mongoose-encryption');
+//const encrypt = require('mongoose-encryption'); //now elevating to hash md-5 instead of encryption
+const md5 = require('md5');
 
 
 
@@ -26,12 +27,12 @@ const userSchema = new mongoose.Schema ({
   email:String,
   password:String
 });
+/* Only add these if lazy you want to use encryption instead of hashing as your security
 //add these next two lines before creating Models
 //HIDDEN SECRET LINE SENT TO .ENV
 const secret = process.env.SECRET;
 userSchema.plugin(encrypt, { secret: secret, encryptedFields: ["password"]});
-
-
+*/
 const User = mongoose.model("User", userSchema);
 
 
@@ -47,7 +48,7 @@ app.get("/login", function(req, res) {
 app.post("/login", function(req, res) {
   //at this point, search and confirm user exists then allow.
   const username = req.body.username;
-  const password = req.body.password;
+  const password = md5(req.body.password);//for hashing. normal leave as just req
 
     User.findOne({email: username}, function(err, foundUser){
       if (err){
@@ -77,7 +78,9 @@ app.post("/register", function(req, res) {
   //at this point, add user to database
   const newUser = new User ({
      email:req.body.username,
-     password: req.body.password
+     //password: req.body.password, - normal or encryption security
+     password: md5(req.body.password) // hashing security
+
    }); //new user
 
     newUser.save(function(err){
