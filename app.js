@@ -37,7 +37,8 @@ mongoose.connect('mongodb://localhost:27017/userDB'); //localserver
 
 const userSchema = new mongoose.Schema ({
   email:String,
-  password:String
+  password:String,
+  googleId:String //add this only when you have googleOAUTh enabled
 });
 
 //here add your passport local mongoose
@@ -51,8 +52,6 @@ const User = mongoose.model("User", userSchema);
 //here add the passport local mongoose for serialising and deserialising
 passport.use(User.createStrategy());
 
-//passport.serializeUser(User.serializeUser());
-//passport.deserializeUser(User.deserializeUser());
 
 passport.serializeUser(function(user, done) {
   done(null, user);
