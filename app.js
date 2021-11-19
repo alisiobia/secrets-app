@@ -4,10 +4,9 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require('mongoose');
-//const encrypt = require('mongoose-encryption'); //now elevating to hash md-5 instead of encryption
-//const md5 = require('md5'); // for simple hashing
-const bcrypt = require("bcrypt"); // for even better security
-const saltRounds = 10; // bcrypt salt round numbers for security
+const session = require('express-session');
+const passport = require('passport');
+const passportLocalMongoose = require('passport-local-mongoose');
 
 
 
@@ -21,6 +20,16 @@ app.use(bodyParser.urlencoded({
   extended: true
 }));
 
+//place session just above mongoDB !important and below app.use
+app.use(session({
+  secret: process.env.SECRET,
+  resave: false,
+  saveUninitialized: false,
+  //cookie: { secure: true }
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
 
 mongoose.connect('mongodb://localhost:27017/userDB'); //localserver
 
@@ -29,13 +38,21 @@ const userSchema = new mongoose.Schema ({
   email:String,
   password:String
 });
-/* Only add these if lazy you want to use encryption instead of hashing as your security
-//add these next two lines before creating Models
-//HIDDEN SECRET LINE SENT TO .ENV
-const secret = process.env.SECRET;
-userSchema.plugin(encrypt, { secret: secret, encryptedFields: ["password"]});
-*/
+
+//here add your passport local mongoose
+//User.plugin(passportLocalMongoose); //replace user with your own schema
+userSchema.plugin(passportLocalMongoose);
+
+
 const User = mongoose.model("User", userSchema);
+
+//here add the passport local mongoose for serialising and deserialising
+passport.use(User.createStrategy());
+
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
+
 
 
 
@@ -48,67 +65,61 @@ app.get("/login", function(req, res) {
 });//get login
 
 app.post("/login", function(req, res) {
-  //at this point, search and confirm user exists then allow.
-  const username = req.body.username;
-  const password = req.body.password;
-  //const password = md5(req.body.password);//for hashing. normal leave as just req
 
+// create a User object using the items entered from the form
+  const oldUser = new User ({
+     username: req.body.username,
+     password:req.body.password
+   }); //old user
 
-
-    User.findOne({email: username}, function(err, foundUser){
-      if (err){
+//use passport to login the user and authenticate the user
+      req.login(oldUser, function(err) {
+      if (err) {
         console.log(err);
+        res.send("Not Authenticated")
       } else {
-        if (foundUser) {
-          // Load hash from your password DB.
-                bcrypt.compare(password, foundUser.password, function(err, result) {
-                   // result == true
-                   if (result === true) {
-                     res.render("secrets")
-                   } else {
-                     res.send("Incorrect password. Try again")
-                   }
-                });
-        } else { // if no found user
-            res.send("User does not exist. Please register")
-        }
-      };//if no error and there is a found user
-    });//find login
+        passport.authenticate("local")(req,res, function(){
+          res.redirect("/secrets");
+      });
+      }
+      });
+
     });//post login
 
 
 app.get("/register", function(req, res) {
-  res.render("register")
+res.render("register")
 });//get register
 
+app.get("/secrets", function(req, res) {
+//check if user is authenticated first before rendering
+  if (req.isAuthenticated()) {
+    res.render("secrets");
+  } else {
+    res.redirect("/login");
+  }
+});//get secrets
+
 app.post("/register", function(req, res) {
-//add bycrypt hash for good security
-  bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
-      // Store hash in your password DB.
-      //at this point, add user to database
-      const newUser = new User ({
-         email:req.body.username,
-         //password: req.body.password, - normal or encryption security
-         //password: md5(req.body.password) // hashing security
-         password: hash // for hash encryption
+  User.register({username:req.body.username}, req.body.password, function(err, foundUser) {
+    if (err) {
+      console.log(err);
+      res.redirect("/register")
+    } else {
+      passport.authenticate("local")(req,res, function(){
+        res.redirect("/secrets")
+      })
+    }
 
-       }); //new user
-
-        newUser.save(function(err){
-         if (!err) {
-           res.render("secrets")
-         } else {
-           console.log(err);
-         }
-      })//save user
-  });
-
-
-
-
+});
 
 });//post register
 
+
+app.get('/logout', function(req, res){
+  req.logout();
+  res.redirect('/');
+});//get logout
 
 
 app.listen(3000, function() {
