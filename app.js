@@ -69,10 +69,10 @@ app.post("/login", function(req, res) {
                      res.send("Incorrect password. Try again")
                    }
                 });
-        } else {
+        } else { // if no found user
             res.send("User does not exist. Please register")
         }
-      };//if no error
+      };//if no error and there is a found user
     });//find login
     });//post login
 
