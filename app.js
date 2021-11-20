@@ -40,7 +40,8 @@ mongoose.connect('mongodb://localhost:27017/userDB'); //localserver
 const userSchema = new mongoose.Schema ({
   email:String,
   password:String,
-  googleId:String //add this only when you have googleOAUTh enabled
+  googleId:String, //add this only when you have googleOAUTh enabled
+  secret:String
 });
 
 //here add your passport local mongoose
@@ -161,12 +162,17 @@ res.render("register")
 });//get register
 
 app.get("/secrets", function(req, res) {
-//check if user is authenticated first before rendering
-  if (req.isAuthenticated()) {
-    res.render("secrets");
-  } else {
-    res.redirect("/login");
-  }
+ User.find({"secret":{$ne:null}},function(err, foundUsers){
+   if (err) {
+     console.log(err);
+   } else {
+     if (foundUsers) {
+       res.render("secrets", {usersWithSecrets:foundUsers});
+   }
+ }
+ }); //ne means not equal to
+
+
 });//get secrets
 
 app.post("/register", function(req, res) {
@@ -183,6 +189,32 @@ app.post("/register", function(req, res) {
 });
 
 });//post register
+
+app.get("/submit", function(req, res) {
+//check if user is authenticated first before rendering
+  if (req.isAuthenticated()) {
+    res.render("submit");
+  } else {
+    res.redirect("/login");
+  }
+});//get submit
+
+app.post("/submit", function(req, res) {
+  const submittedSecret = req.body.secret;
+
+  //find who the current user is and save into their file.
+  User.findById(req.user._id, function (err, foundUser) {
+    if (err) {
+      console.log(err);
+    } else {
+      if (foundUser) {
+        foundUser.secret = submittedSecret;
+        foundUser.save(function(){res.redirect("/secrets")});
+      }
+    }
+  });
+
+});//post submit
 
 
 app.get('/logout', function(req, res){
